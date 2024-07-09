@@ -1,0 +1,100 @@
+version: "3.5"
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sleep infinity
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    networks:
+      - MONGO
+    depends_on:
+      - mongo
+      - redis
+    volumes:
+      - .:/app
+  redis:
+    container_name: redis
+    image: redis:latest
+    restart: always
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+    volumes:
+      - type: volume
+        source: REDIS_DATA
+        target: /data/redis
+      - type: volume
+        source: REDIS_CONFIG
+        target: /usr/local/etc/redis/redis.conf
+    networks:
+      - MONGO
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander
+    restart: always
+    environment:
+      REDIS_HOSTS: redis
+      REDIS_HOST: redis
+      REDIS_PORT: redis:6379
+      HTTP_USER: root
+      HTTP_PASSWORD: root
+    ports:
+      - "8082:8081"
+    networks:
+      - MONGO
+    depends_on:
+      - redis
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_DATABASE: chat
+    ports:
+      - "27017:27017"
+    networks:
+      - MONGO
+    volumes:
+      - type: volume
+        source: MONGO_DATA
+        target: /data/db
+      - type: volume
+        source: MONGO_CONFIG
+        target: /data/configdb
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin
+      ME_CONFIG_MONGODB_URL: mongodb://admin:admin@mongo:27017/
+      ME_CONFIG_BASICAUTH: false
+    ports:
+      - "8081:8081"
+    networks:
+      - MONGO
+    depends_on:
+      - mongo
+
+networks:
+  MONGO:
+    name: MONGO
+    driver: bridge
+
+volumes:
+  MONGO_DATA:
+    name: MONGO_DATA
+  MONGO_CONFIG:
+    name: MONGO_CONFIG
+  REDIS_DATA:
+    name: REDIS_DATA
+  REDIS_CONFIG:
+    name: REDIS_CONFIG
